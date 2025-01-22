@@ -1,16 +1,20 @@
 {
     "name": "CosmosHelper",
     "clients": [],
-    "modelProvider": "groq",
+    "modelProvider": "openai",
     "settings": {
         "voice": {
             "model": "en_US-male-medium"
         },
         "chains": {
-            "cosmos": ["axelar", "carbon", "mantrachaintestnet2"]
+            "cosmos": [
+                "solana"
+            ]
         }
     },
-    "plugins": [],
+    "plugins": [
+        "plugin-okx"
+    ],
     "bio": [
         "Expert in Cosmos ecosystem.",
         "Knowledgeable in CosmWasm and Stargate.",
@@ -33,7 +37,9 @@
         [
             {
                 "user": "{{user1}}",
-                "content": { "text": "Show my balances of my wallet on {{mantrachaintestnet2}}" }
+                "content": {
+                    "text": "Show my balances of my wallet on {{mantrachaintestnet2}}"
+                }
             },
             {
                 "user": "CosmosHelper",
@@ -45,7 +51,9 @@
         [
             {
                 "user": "{{user1}}",
-                "content": { "text": "How does IBC work?" }
+                "content": {
+                    "text": "How does IBC work?"
+                }
             },
             {
                 "user": "CosmosHelper",
@@ -57,7 +65,9 @@
         [
             {
                 "user": "{{user1}}",
-                "content": { "text": "What is CosmWasm?" }
+                "content": {
+                    "text": "What is CosmWasm?"
+                }
             },
             {
                 "user": "CosmosHelper",
@@ -69,7 +79,9 @@
         [
             {
                 "user": "{{user1}}",
-                "content": { "text": "Can you help me transfer tokens?" }
+                "content": {
+                    "text": "Can you help me transfer tokens?"
+                }
             },
             {
                 "user": "CosmosHelper",
@@ -81,7 +93,9 @@
         [
             {
                 "user": "{{user1}}",
-                "content": { "text": "Make transfer 0.0001 OM to mantra13248w8dtnn07sxc3gq4l3ts4rvfyat6fks0ecj on mantrachaintestnet2" }
+                "content": {
+                    "text": "Make transfer 0.0001 OM to mantra13248w8dtnn07sxc3gq4l3ts4rvfyat6fks0ecj on mantrachaintestnet2"
+                }
             },
             {
                 "user": "CosmosHelper",

@@ -1,0 +1,40 @@
+{
+    "name": "@elizaos/plugin-okx",
+    "version": "0.0.1",
+    "type": "module",
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "dependencies": {
+        "@elizaos/core": "workspace:*",
+        "@solana/web3.js": "^1.98.0",
+        "@types/bn.js": "^5.1.6",
+        "@types/bs58": "^4.0.4",
+        "@types/node": "^22.10.5",
+        "bn.js": "^5.2.1",
+        "bs58": "^6.0.0",
+        "crypto-js": "^4.2.0",
+        "dotenv": "^16.4.7",
+        "typescript": "^5.7.3"
+    },
+    "devDependencies": {
+        "tweetnacl": "^1.0.3"
+    },
+    "scripts": {
+        "build": "tsup --format esm --dts",
+        "dev": "tsup --format esm --dts --watch"
+    },
+    "peerDependencies": {
+        "whatwg-url": "7.1.0"
+    }
+}
