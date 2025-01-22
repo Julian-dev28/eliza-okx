@@ -1,5 +1,5 @@
 export interface TokenInfo {
-    decimal: string;
+    decimals: string;
     isHoneyPot: boolean;
     taxRate: string;
     tokenContractAddress: string;
