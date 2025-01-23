@@ -2,7 +2,7 @@
 import type { Plugin } from "@elizaos/core";
 import { getOKXActions } from "./actions";
 
-async function OKXPlugin(
+async function createOKXPlugin(
     getSetting: (key: string) => string | undefined
 ): Promise<Plugin> {
     // Validate required settings
@@ -50,4 +50,4 @@ async function OKXPlugin(
     }
 }
 
-export default OKXPlugin;
+export default createOKXPlugin;

@@ -1,5 +1,4 @@
-import OKXPlugin from "../../packages/plugin-okx/dist/index.js";
-
+import createOKXPlugin from "../../packages/plugin-okx/dist/index.js";
 import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite";
 import { PostgresDatabaseAdapter } from "@elizaos/adapter-postgres";
 import { RedisClient } from "@elizaos/adapter-redis";
@@ -454,7 +453,9 @@ export async function createAgent(
             getSecret(character, "OKX_PROJECT_ID") &&
             getSecret(character, "SOLANA_RPC_URL") &&
             getSecret(character, "PRIVATE_KEY")
-                ? await OKXPlugin((secret) => getSecret(character, secret))
+                ? await createOKXPlugin((secret) =>
+                      getSecret(character, secret)
+                  )
                 : null,
             bootstrapPlugin,
         ].filter(Boolean),
