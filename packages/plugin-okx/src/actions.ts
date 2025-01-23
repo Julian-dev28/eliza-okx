@@ -16,8 +16,8 @@ import {
     APIResponse,
     FormattedSwapResponse,
     QuoteData,
-    TokenInfoList,
     TokenListInfo,
+    SwapExecutionData,
 } from "./okx/types";
 
 // Constants for native SOL
@@ -134,7 +134,7 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
             throw new Error("Failed to fetch token information");
         }
 
-        console.log("First few tokens:", tokenListResponse.data.slice(0, 5));
+        // console.log("First few tokens:", tokenListResponse.data.slice(0, 5));
 
         // Create token maps with proper typing
         const symbolToToken = new Map<string, TokenListInfo>();
@@ -167,15 +167,15 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
                     addressToToken.set(wsolAddress.toLowerCase(), wsolToken);
                 }
 
-                console.log(
-                    `Mapped token: ${symbol} -> ${address} (decimals: ${token.decimals})`
-                );
+                // console.log(
+                //     `Mapped token: ${symbol} -> ${address} (decimals: ${token.decimals})`
+                // );
             }
         });
 
         // Debug output
-        const availableSymbols = Array.from(symbolToToken.keys()).sort();
-        console.log("Available symbols:", availableSymbols);
+        // const availableSymbols = Array.from(symbolToToken.keys()).sort();
+        // console.log("Available symbols:", availableSymbols);
 
         // Resolve token info using maps
         const fromTokenInfo =
@@ -249,12 +249,15 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
     }
 }
 
-function formatQuoteResponse(quote: QuoteData): FormattedSwapResponse {
-    // Use decimal from quote response
+function formatQuoteResponse(
+    data: QuoteData | SwapExecutionData
+): FormattedSwapResponse {
+    // Extract the relevant data whether it's a quote or swap response
+    const quote = "routerResult" in data ? data.routerResult : data;
+
     const fromDecimals = parseInt(quote.fromToken.decimal);
     const toDecimals = parseInt(quote.toToken.decimal);
 
-    // Convert amounts using proper decimals
     const displayFromAmount = (
         Number(quote.fromTokenAmount) / Math.pow(10, fromDecimals)
     ).toString();
@@ -269,13 +272,13 @@ function formatQuoteResponse(quote: QuoteData): FormattedSwapResponse {
             fromToken: {
                 symbol: quote.fromToken.tokenSymbol,
                 amount: displayFromAmount,
-                decimal: quote.fromToken.decimal, // Keep original decimal field
+                decimal: quote.fromToken.decimal,
                 unitPrice: quote.fromToken.tokenUnitPrice,
             },
             toToken: {
                 symbol: quote.toToken.tokenSymbol,
                 amount: displayToAmount,
-                decimal: quote.toToken.decimal, // Keep original decimal field
+                decimal: quote.toToken.decimal,
                 unitPrice: quote.toToken.tokenUnitPrice,
             },
             priceImpact: quote.priceImpactPercentage + "%",
@@ -329,6 +332,7 @@ function getActionHandler(
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
                         slippage: "0.1",
+                        userWalletAddress: process.env.WALLET_ADDRESS,
                     });
 
                     console.log(
@@ -356,6 +360,7 @@ function getActionHandler(
                         amount: params.amount,
                         autoSlippage: true,
                         maxAutoSlippage: "1000",
+                        userWalletAddress: process.env.WALLET_ADDRESS,
                     });
 
                     if (swapResponse.code !== "0" || !swapResponse.data?.[0]) {
@@ -375,11 +380,110 @@ function getActionHandler(
 
                 case "EXECUTE_SWAP": {
                     const params = await extractSwapParams(message, client);
-                    result = await client.dex.executeSwap({
+                    console.log("Getting swap data with params:", params);
+
+                    // First get the swap data with proper parameters
+                    const swapResponse = await client.dex.getSwapData({
                         chainId: "501",
-                        ...params,
-                        slippage: "0.1",
+                        fromTokenAddress: params.fromTokenAddress,
+                        toTokenAddress: params.toTokenAddress,
+                        amount: params.amount,
+                        slippage: "0.5",
+                        userWalletAddress: process.env.WALLET_ADDRESS,
                     });
+
+                    console.log(
+                        "Received swap data response:",
+                        JSON.stringify(swapResponse, null, 2)
+                    );
+
+                    if (swapResponse.code !== "0" || !swapResponse.data?.[0]) {
+                        throw new Error(
+                            swapResponse?.msg || "Failed to get swap data"
+                        );
+                    }
+
+                    // Get the router result which contains our token data
+                    const routerResult = swapResponse.data[0];
+                    const txData = swapResponse.data[0].tx;
+
+                    if (
+                        !routerResult.routerResult?.fromToken?.decimal ||
+                        !routerResult.routerResult?.toToken?.decimal
+                    ) {
+                        console.error(
+                            "Missing decimal information in token data:",
+                            routerResult
+                        );
+                        throw new Error("Invalid token decimal information");
+                    }
+
+                    // Format the amounts for display using actual token decimal data
+                    const { routerResult: swapResult } = routerResult;
+                    const fromDecimals = parseInt(swapResult.fromToken.decimal);
+                    const toDecimals = parseInt(swapResult.toToken.decimal);
+
+                    const displayFromAmount = (
+                        parseFloat(swapResult.fromTokenAmount) /
+                        Math.pow(10, fromDecimals)
+                    ).toFixed(6);
+
+                    const displayToAmount = (
+                        parseFloat(swapResult.toTokenAmount) /
+                        Math.pow(10, toDecimals)
+                    ).toFixed(6);
+
+                    console.log("Executing swap with data:", {
+                        fromToken: swapResult.fromToken.tokenSymbol,
+                        toToken: swapResult.toToken.tokenSymbol,
+                        fromAmount: displayFromAmount,
+                        expectedOutput: displayToAmount,
+                        priceImpact: swapResult.priceImpactPercentage,
+                    });
+
+                    // Execute the swap with the same parameters
+                    const executeResult = await client.dex.executeSwap({
+                        chainId: "501",
+                        fromTokenAddress: params.fromTokenAddress,
+                        toTokenAddress: params.toTokenAddress,
+                        amount: params.amount,
+                        slippage: "0.5",
+                        userWalletAddress: process.env.WALLET_ADDRESS,
+                    });
+
+                    // Format the result for display
+                    const formattedResult = {
+                        success: executeResult.success,
+                        transaction: {
+                            id: executeResult.transactionId,
+                            explorerUrl: executeResult.explorerUrl,
+                        },
+                        swapDetails: {
+                            fromToken: {
+                                symbol: swapResult.fromToken.tokenSymbol,
+                                amount: displayFromAmount,
+                                decimal: swapResult.fromToken.decimal,
+                            },
+                            toToken: {
+                                symbol: swapResult.toToken.tokenSymbol,
+                                amount: displayToAmount,
+                                decimal: swapResult.toToken.decimal,
+                            },
+                            priceImpact: swapResult.priceImpactPercentage + "%",
+                            route:
+                                swapResult.quoteCompareList[0]?.dexName ||
+                                "Unknown",
+                            txData: txData?.data,
+                        },
+                        summary:
+                            `Swap executed successfully!\n` +
+                            `Swapped ${displayFromAmount} ${swapResult.fromToken.tokenSymbol} for approximately ${displayToAmount} ${swapResult.toToken.tokenSymbol}\n` +
+                            `Price Impact: ${swapResult.priceImpactPercentage}%\n` +
+                            `Transaction ID: ${executeResult.transactionId}\n` +
+                            `View on Explorer: ${executeResult.explorerUrl}`,
+                    };
+
+                    result = formattedResult;
                     break;
                 }
 
