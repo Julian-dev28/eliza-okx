@@ -12,6 +12,7 @@ import {
     NetworkConfigs,
     ChainConfig,
     SwapResponseData,
+    ChainData,
 } from "../types";
 import base58 from "bs58";
 import * as solanaWeb3 from "@solana/web3.js";
@@ -84,7 +85,7 @@ export class DexAPI {
         );
     }
 
-    async getSupportedChains(chainId: string): Promise<APIResponse<QuoteData>> {
+    async getSupportedChains(chainId: string): Promise<APIResponse<ChainData>> {
         return this.client.request(
             "GET",
             "/api/v5/dex/aggregator/supported/chain",

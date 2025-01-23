@@ -1,4 +1,4 @@
-import createOKXPlugin from "../../packages/plugin-okx/dist/index.js";
+import OKXPlugin from "../../packages/plugin-okx/dist/index.js";
 
 import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite";
 import { PostgresDatabaseAdapter } from "@elizaos/adapter-postgres";
@@ -53,7 +53,8 @@ export function parseArguments(): {
             })
             .option("characters", {
                 type: "string",
-                description: "Comma separated list of paths to character JSON files",
+                description:
+                    "Comma separated list of paths to character JSON files",
             })
             .parseSync();
     } catch (error) {
@@ -115,7 +116,9 @@ export async function loadCharacterFromOnchain(): Promise<Character[]> {
         const character = JSON.parse(jsonText);
         validateCharacterConfig(character);
         const characterId = character.id || character.name;
-        const characterPrefix = `CHARACTER.${characterId.toUpperCase().replace(/ /g, "_")}.`;
+        const characterPrefix = `CHARACTER.${characterId
+            .toUpperCase()
+            .replace(/ /g, "_")}.`;
         const characterSettings = Object.entries(process.env)
             .filter(([key]) => key.startsWith(characterPrefix))
             .reduce((settings, [key, value]) => {
@@ -146,7 +149,9 @@ export async function loadCharacterFromOnchain(): Promise<Character[]> {
         loadedCharacters.push(character);
         return loadedCharacters;
     } catch (e) {
-        elizaLogger.error(`Error parsing character from ${process.env.IQ_WALLET_ADDRESS}: ${e}`);
+        elizaLogger.error(
+            `Error parsing character from ${process.env.IQ_WALLET_ADDRESS}: ${e}`
+        );
         process.exit(1);
     }
 }
@@ -177,7 +182,9 @@ async function jsonToCharacter(
 ): Promise<Character> {
     validateCharacterConfig(character);
     const characterId = character.id || character.name;
-    const characterPrefix = `CHARACTER.${characterId.toUpperCase().replace(/ /g, "_")}.`;
+    const characterPrefix = `CHARACTER.${characterId
+        .toUpperCase()
+        .replace(/ /g, "_")}.`;
     const characterSettings = Object.entries(process.env)
         .filter(([key]) => key.startsWith(characterPrefix))
         .reduce((settings, [key, value]) => {
@@ -196,7 +203,9 @@ async function jsonToCharacter(
     character.plugins = await handlePluginImporting(character.plugins);
 
     if (character.extends) {
-        elizaLogger.info(`Merging ${character.name} character with parent characters`);
+        elizaLogger.info(
+            `Merging ${character.name} character with parent characters`
+        );
         for (const extendPath of character.extends) {
             const baseCharacter = await loadCharacter(
                 path.resolve(path.dirname(filePath), extendPath)
@@ -224,7 +233,11 @@ async function loadCharacterTryPath(characterPath: string): Promise<Character> {
         path.resolve(__dirname, characterPath),
         path.resolve(__dirname, "characters", path.basename(characterPath)),
         path.resolve(__dirname, "../characters", path.basename(characterPath)),
-        path.resolve(__dirname, "../../characters", path.basename(characterPath)),
+        path.resolve(
+            __dirname,
+            "../../characters",
+            path.basename(characterPath)
+        ),
     ];
 
     let content: string | null = null;
@@ -239,8 +252,12 @@ async function loadCharacterTryPath(characterPath: string): Promise<Character> {
     }
 
     if (content === null) {
-        elizaLogger.error(`Error loading character from ${characterPath}: File not found in any of the expected locations`);
-        throw new Error(`Error loading character from ${characterPath}: File not found in any of the expected locations`);
+        elizaLogger.error(
+            `Error loading character from ${characterPath}: File not found in any of the expected locations`
+        );
+        throw new Error(
+            `Error loading character from ${characterPath}: File not found in any of the expected locations`
+        );
     }
 
     try {
@@ -257,12 +274,14 @@ function commaSeparatedStringToArray(commaSeparated: string): string[] {
     return commaSeparated?.split(",").map((value) => value.trim());
 }
 
-async function readCharactersFromStorage(characterPaths: string[]): Promise<string[]> {
+async function readCharactersFromStorage(
+    characterPaths: string[]
+): Promise<string[]> {
     try {
         const uploadDir = path.join(process.cwd(), "data", "characters");
         await fs.promises.mkdir(uploadDir, { recursive: true });
         const fileNames = await fs.promises.readdir(uploadDir);
-        fileNames.forEach(fileName => {
+        fileNames.forEach((fileName) => {
             characterPaths.push(path.join(uploadDir, fileName));
         });
     } catch (err) {
@@ -271,10 +290,12 @@ async function readCharactersFromStorage(characterPaths: string[]): Promise<stri
     return characterPaths;
 }
 
-export async function loadCharacters(charactersArg: string): Promise<Character[]> {
+export async function loadCharacters(
+    charactersArg: string
+): Promise<Character[]> {
     let characterPaths = commaSeparatedStringToArray(charactersArg);
 
-    if(process.env.USE_CHARACTER_STORAGE === "true") {
+    if (process.env.USE_CHARACTER_STORAGE === "true") {
         characterPaths = await readCharactersFromStorage(characterPaths);
     }
 
@@ -283,7 +304,9 @@ export async function loadCharacters(charactersArg: string): Promise<Character[]
     if (characterPaths?.length > 0) {
         for (const characterPath of characterPaths) {
             try {
-                const character: Character = await loadCharacterTryPath(characterPath);
+                const character: Character = await loadCharacterTryPath(
+                    characterPath
+                );
                 loadedCharacters.push(character);
             } catch (e) {
                 process.exit(1);
@@ -293,7 +316,9 @@ export async function loadCharacters(charactersArg: string): Promise<Character[]
 
     if (hasValidRemoteUrls()) {
         elizaLogger.info("Loading characters from remote URLs");
-        const characterUrls = commaSeparatedStringToArray(process.env.REMOTE_CHARACTER_URLS);
+        const characterUrls = commaSeparatedStringToArray(
+            process.env.REMOTE_CHARACTER_URLS
+        );
         for (const characterUrl of characterUrls) {
             const characters = await loadCharactersFromUrl(characterUrl);
             loadedCharacters.push(...characters);
@@ -317,7 +342,10 @@ async function handlePluginImporting(plugins: string[]) {
                     const importedPlugin = await import(plugin);
                     return importedPlugin.default;
                 } catch (importError) {
-                    elizaLogger.error(`Failed to import plugin: ${plugin}`, importError);
+                    elizaLogger.error(
+                        `Failed to import plugin: ${plugin}`,
+                        importError
+                    );
                     return null;
                 }
             })
@@ -333,9 +361,15 @@ export function getTokenForProvider(
 ): string | undefined {
     switch (provider) {
         case ModelProviderName.OPENAI:
-            return character.settings?.secrets?.OPENAI_API_KEY || settings.OPENAI_API_KEY;
+            return (
+                character.settings?.secrets?.OPENAI_API_KEY ||
+                settings.OPENAI_API_KEY
+            );
         case ModelProviderName.ANTHROPIC:
-            return character.settings?.secrets?.ANTHROPIC_API_KEY || settings.ANTHROPIC_API_KEY;
+            return (
+                character.settings?.secrets?.ANTHROPIC_API_KEY ||
+                settings.ANTHROPIC_API_KEY
+            );
         default:
             const errorMessage = `Failed to get token - unsupported model provider: ${provider}`;
             elizaLogger.error(errorMessage);
@@ -345,7 +379,10 @@ export function getTokenForProvider(
 
 function initializeDatabase(dataDir: string): IDatabaseAdapter {
     if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-        const db = new SupabaseDatabaseAdapter(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+        const db = new SupabaseDatabaseAdapter(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_ANON_KEY
+        );
         db.init();
         return db;
     } else if (process.env.POSTGRES_URL) {
@@ -356,9 +393,12 @@ function initializeDatabase(dataDir: string): IDatabaseAdapter {
         db.init();
         return db;
     } else if (process.env.PGLITE_DATA_DIR) {
-        return new PGLiteDatabaseAdapter({ dataDir: process.env.PGLITE_DATA_DIR });
+        return new PGLiteDatabaseAdapter({
+            dataDir: process.env.PGLITE_DATA_DIR,
+        });
     } else {
-        const filePath = process.env.SQLITE_FILE ?? path.resolve(dataDir, "db.sqlite");
+        const filePath =
+            process.env.SQLITE_FILE ?? path.resolve(dataDir, "db.sqlite");
         const db = new SqliteDatabaseAdapter(new Database(filePath));
         db.init();
         return db;
@@ -377,7 +417,9 @@ export async function initializeClients(
                 for (const client of plugin.clients) {
                     const startedClient = await client.start(runtime);
                     const clientType = "OKX";
-                    elizaLogger.debug(`Initializing client of type: ${clientType}`);
+                    elizaLogger.debug(
+                        `Initializing client of type: ${clientType}`
+                    );
                     clients[clientType] = startedClient;
                 }
             }
@@ -412,19 +454,18 @@ export async function createAgent(
             getSecret(character, "OKX_PROJECT_ID") &&
             getSecret(character, "SOLANA_RPC_URL") &&
             getSecret(character, "PRIVATE_KEY")
-                ? await createOKXPlugin((secret) => getSecret(character, secret))
+                ? await OKXPlugin((secret) => getSecret(character, secret))
                 : null,
             bootstrapPlugin,
         ].filter(Boolean),
         providers: [],
         actions: [],
         services: [],
-         managers: [],
+        managers: [],
         cacheManager: cache,
         fetch: fetch,
     });
 }
-
 
 function initializeFsCache(baseDir: string, character: Character) {
     if (!character?.id) {
@@ -594,7 +635,7 @@ const startAgents = async () => {
 
     const notOnchainJson = !onchainJson || onchainJson == "null";
 
-  if ((notOnchainJson && charactersArg) || hasValidRemoteUrls()) {
+    if ((notOnchainJson && charactersArg) || hasValidRemoteUrls()) {
         characters = await loadCharacters(charactersArg);
     }
 

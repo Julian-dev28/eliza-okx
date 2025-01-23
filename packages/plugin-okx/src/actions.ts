@@ -315,7 +315,17 @@ function getActionHandler(
 
             switch (actionName) {
                 case "GET_CHAIN_DATA":
-                    result = await client.dex.getSupportedChains("501");
+                    const chainData = await client.dex.getSupportedChains(
+                        "501"
+                    );
+                    result = {
+                        chains: chainData.data.map((chain) => ({
+                            id: chain.chainId,
+                            name: chain.chainName,
+                            dexApprovalAddress:
+                                chain.dexTokenApproveAddress || null,
+                        })),
+                    };
                     break;
 
                 case "GET_LIQUIDITY_PROVIDERS":

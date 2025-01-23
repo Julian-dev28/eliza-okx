@@ -83,6 +83,12 @@ export interface QuoteData {
     tx?: TransactionData;
 }
 
+export interface ChainData {
+    chainId: string;
+    chainName: string;
+    dexTokenApproveAddress: string | null;
+}
+
 // New interface specifically for swap responses
 export interface SwapResponseData {
     data: {
@@ -177,6 +183,8 @@ export interface OKXConfig {
     baseUrl?: string;
     networks?: NetworkConfigs;
     solana?: SolanaConfig;
+    timeout?: number;
+    maxRetries?: number;
 }
 
 // Generic request params
