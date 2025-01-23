@@ -1,156 +1,123 @@
-# @elizaos/plugin-goat
+# @elizaos/plugin-okx
 
-A plugin for integrating blockchain capabilities through the GOAT (Great Onchain Agent Toolkit) framework within the ElizaOS ecosystem.
+A plugin for integrating OKX DEX capabilities within the ElizaOS ecosystem, currently supporting Solana network trading.
 
 ## Description
 
-[GOAT](https://ohmygoat.dev/) 🐐 (Great Onchain Agent Toolkit) is an open-source framework for adding blockchain tools such as wallets, being able to hold or trade tokens, or interacting with blockchain smart contracts, to your AI agent.
+OKX DEX is a trading aggregator that this plugin integrates with Eliza. Currently, this plugin only supports:
 
-- [Chains supported](https://ohmygoat.dev/chains-wallets-plugins)
-- [Plugins supported](https://ohmygoat.dev/chains-wallets-plugins)
-
-This plugin integrates GOAT with Eliza, giving your agent the ability to interact with many different protocols. The current setup adds onchain capabilities to your agent to send and check balances of ETH and USDC, and to swap tokens using KIM protocol. Add all the capabilities you need by adding more plugins (read below for more information)!
+-   Trading tokens on the Solana network
+-   Direct routing through single liquidity pools
+-   Price impact protection and slippage controls
 
 ## Installation
 
 ```bash
-pnpm install @elizaos/plugin-goat
+pnpm install @elizaos/plugin-okx
 ```
 
 ## Configuration
 
+### Developer Portal Setup
+
+1. **Create Developer Account**
+
+    - Visit the [OKX Developer Portal](https://www.okx.com/developers)
+    - Click "Connect Wallet" (OKX Wallet recommended)
+    - Complete wallet signature verification
+
+2. **Create Project**
+
+    - Click "Create New Project"
+    - Enter project name and description
+    - Click "Confirm"
+
+3. **Generate API Keys**
+    - In your project, click "Manage"
+    - Click "Create API Key"
+    - Enter API key name and passphrase
+    - Store the generated API key, secret key, and passphrase securely
+
 ### Environment Variables
-```typescript
-EVM_PRIVATE_KEY=<Your EVM wallet private key>
-EVM_PROVIDER_URL=<Your RPC provider URL (e.g., Infura, Alchemy)>
-```
-
-## Configure GOAT for your use case
-
-1. Configure the chain you want to use by updating the `wallet.ts` file (see all available chains at [https://ohmygoat.dev/chains](https://ohmygoat.dev/chains))
-2. Specify the actions you want to have by updating the `actions.ts` file
-3. Add the plugins you need to perform these actions to the `getOnChainTools` function (uniswap, polymarket, etc. see all available plugins at [https://ohmygoat.dev/chains-wallets-plugins](https://ohmygoat.dev/chains-wallets-plugins))
-4. Build the project running `pnpm build`
-5. Add the necessary environment variables to set up your wallet and plugins
-6. Run your agent!
-
-## Common Issues
-1. **Agent not executing an action**:
-    - If you are also using the EVM Plugin, sometimes the agent might confuse the action name with an EVM Plugin action name instead of the GOAT Plugin action. Removing the EVM Plugin should fix this issue. There is no need for you to use both plugins at the same time.
-    - If you are using Trump as a character it might be tricky to get them to perform any action since the character is full of prompts that aim to change the topic of the conversation. To fix this try using a different character or create your own with prompts that are more suitable to what the agent is supposed to do.
-
-## Plugins
-GOAT itself has several plugins for interacting with different protocols such as Polymarket, Uniswap, and many more. (see all available plugins at [https://ohmygoat.dev/chains-wallets-plugins](https://ohmygoat.dev/chains-wallets-plugins))
-
-You can easily add them by installing them and adding them to the `getOnChainActions` function:
 
 ```typescript
-const tools = getOnChainActions({
-  wallet: walletClient,
-  plugins: [
-    sendETH(),
-    erc20({ tokens: [USDC, PEPE] }),
-    polymarket(),
-    uniswap(),
-    // ...
-  ],
-})
+# OKX API Configuration
+OKX_PROJECT_ID=<Your OKX project ID>
+OKX_API_KEY=<Your OKX API key>
+OKX_SECRET_KEY=<Your OKX secret key>
+OKX_API_PASSPHRASE=<Your API passphrase>
+
+# Wallet Configuration
+WALLET_ADDRESS=<Your Solana wallet address>
+PRIVATE_KEY=<Your wallet private key>
+
+# Network Configuration
+SOLANA_RPC_URL=<Your Solana RPC endpoint>
+WS_ENDPOINT=<Your WebSocket endpoint>
 ```
 
-See all available plugins at [https://ohmygoat.dev/chains-wallets-plugins](https://ohmygoat.dev/chains-wallets-plugins)
+## Usage
+
+### Basic Swap Example
+
+```typescript
+// Get a quote for Solana tokens
+const quote = await okx.getQuote({
+    chainId: "solana",
+    amount: "1000000000", // Amount in lamports
+    fromTokenAddress: "So11111111111111111111111111111111111111112", // SOL
+    toTokenAddress: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+});
+
+// Execute the swap
+const swap = await okx.swap({
+    ...quote,
+    slippage: "0.005", // 0.5% slippage
+    userWalletAddress: "your_solana_address",
+    directRoute: true, // Use single pool routing
+});
+```
+
+### Advanced Features
+
+-   **Price Impact Protection**: Set `priceImpactProtectionPercentage` to limit maximum price impact
+-   **Direct Routing**: Enable `directRoute` for single-pool routing (recommended for Solana)
+-   **Compute Units**: Control transaction priority with `computeUnitPrice` and `computeUnitLimit`
 
 ## Common Issues & Troubleshooting
 
-1. **Agent not executing an action**:
-   - If you are also using the EVM Plugin, sometimes the agent might confuse the action name with an EVM Plugin action name instead of the GOAT Plugin action. Removing the EVM Plugin should fix this issue. There is no need for you to use both plugins at the same time.
-   - If you are using Trump as a character it might be tricky to get them to perform any action since the character is full of prompts that aim to change the topic of the conversation. To fix this try using a different character or create your own with prompts that are more suitable to what the agent is supposed to do.
+1. **API Authentication Errors**
 
-2. **Wallet Connection Issues**
-   - Verify private key is correctly formatted
-   - Check RPC endpoint availability
-   - Ensure sufficient network balance
+    - Verify API key and credentials are correct
+    - Check timestamp synchronization
+    - Ensure proper signature generation
+    - Confirm passphrase matches the one used during API key creation
 
-3. **Transaction Issues**
-   - Verify gas availability
-   - Check network congestion
-   - Confirm transaction parameters
+2. **Transaction Failures**
 
-## Wallets
-
-GOAT supports many different wallets from key pairs to [Crossmint Smart Wallets](https://docs.crossmint.com/wallets/smart-wallets/overview) and Coinbase.
-
-Read more about wallets at [https://ohmygoat.dev/wallets](https://ohmygoat.dev/wallets).
+    - Verify sufficient SOL balance for fees
+    - Check slippage settings
+    - Confirm token account exists
 
 ## Security Best Practices
 
-1. **Key Management**
-   - Store private keys securely
-   - Use environment variables
-   - Never expose keys in code
+1. **API Security**
+
+    - Store credentials securely
+    - Use environment variables
+    - Rotate keys regularly
+    - Never share your secret key or passphrase
 
 2. **Transaction Safety**
-   - Implement transaction limits
-   - Validate recipient addresses
-   - Double-check transaction amounts
-
-3. **Network Security**
-   - Use secure RPC endpoints
-   - Implement rate limiting
-   - Monitor for suspicious activity
-
-## Development Guide
-
-### Setting Up Development Environment
-
-1. Clone the repository
-2. Install dependencies:
-
-```bash
-pnpm install
-```
-
-3. Build the plugin:
-
-```bash
-pnpm run build
-```
-
-## Future Enhancements
-
-- Additional protocol integrations
-- Multi-chain support
-- Advanced transaction management
-- Enhanced error handling
-- Custom protocol adapters
-- Smart contract interaction templates
-
-## Contributing
-
-Contributions are welcome! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
-
-## Credits
-
-This plugin integrates with and builds upon several key technologies:
-
-- [GOAT](https://ohmygoat.dev/): Great Onchain Agent Toolkit
-- [Crossmint](https://docs.crossmint.com/): Smart wallet infrastructure
-- [Uniswap](https://docs.uniswap.org/): Decentralized exchange protocol
-- [Polymarket](https://docs.polymarket.com/): Prediction market platform
-- [ERC20](https://eips.ethereum.org/EIPS/eip-20): Token standard implementation
-
-Special thanks to:
-- The GOAT development team for the onchain agent framework
-- The Crossmint team for smart wallet solutions
-- The Uniswap and Polymarket teams
-- The Ethereum community for ERC standards
-- The Eliza community for their contributions and feedback
-
-For more information about GOAT capabilities:
-- [GOAT Documentation](https://ohmygoat.dev/)
-- [Available Chains](https://ohmygoat.dev/chains)
-- [Chains, Wallets & Plugins](https://ohmygoat.dev/chains-wallets-plugins)
-- [Smart Wallet Documentation](https://docs.crossmint.com/wallets/smart-wallets/overview)
+    - Set reasonable slippage limits
+    - Use price impact protection
+    - Validate all parameters
 
 ## License
 
 This plugin is part of the Eliza project. See the main project repository for license information.
+
+## Resources
+
+-   [OKX DEX Documentation](https://www.okx.com/web3/build/docs/waas/dex-introduction)
+-   [Developer Portal](https://www.okx.com/developers)
