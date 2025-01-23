@@ -11,7 +11,15 @@ import {
     type ActionExample,
 } from "@elizaos/core";
 import { OKXDexClient } from "../src/okx/core/client";
-import { TokenInfo, APIResponse, FormattedSwapResponse } from "./okx/types";
+import {
+    TokenInfo,
+    APIResponse,
+    FormattedSwapResponse,
+    QuoteData,
+    TokenInfoList,
+    TokenListInfo,
+} from "./okx/types";
+
 // Constants for native SOL
 const NATIVE_SOL = {
     address: "11111111111111111111111111111111",
@@ -113,84 +121,82 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
     try {
         // Get token list for address lookup and decimal information
         console.log("Fetching token information...");
-        const rawResponse = await client.dex.getTokens("501");
-        const tokenResponse = rawResponse as unknown as APIResponse<TokenInfo>;
+        const tokenResponse = await client.dex.getTokens("501");
+        const tokenListResponse =
+            tokenResponse as unknown as APIResponse<TokenListInfo>;
 
         if (
-            !tokenResponse ||
-            tokenResponse.code !== "0" ||
-            !Array.isArray(tokenResponse.data)
+            !tokenListResponse ||
+            tokenListResponse.code !== "0" ||
+            !Array.isArray(tokenListResponse.data)
         ) {
-            console.error("Invalid token response:", tokenResponse);
+            console.error("Invalid token response:", tokenListResponse);
             throw new Error("Failed to fetch token information");
         }
 
-        console.log("First few tokens:", tokenResponse.data.slice(0, 5));
+        console.log("First few tokens:", tokenListResponse.data.slice(0, 5));
 
-        // Create token maps
-        const symbolToToken = new Map();
-        const addressToToken = new Map();
+        // Create token maps with proper typing
+        const symbolToToken = new Map<string, TokenListInfo>();
+        const addressToToken = new Map<string, TokenListInfo>();
 
-        // Build token maps
-        tokenResponse.data.forEach((token) => {
+        // Build token maps from API response
+        tokenListResponse.data.forEach((token) => {
             if (
-                token &&
-                token.tokenSymbol &&
-                token.tokenContractAddress &&
-                token.decimals
+                token?.tokenSymbol &&
+                token?.tokenContractAddress &&
+                token?.decimals
             ) {
                 const symbol = token.tokenSymbol.toUpperCase();
                 const address = token.tokenContractAddress.toLowerCase();
 
+                // Store token info
                 symbolToToken.set(symbol, token);
                 addressToToken.set(address, token);
-                console.log(`Mapped token: ${symbol} -> ${address}`);
+
+                // Handle SOL/WSOL mapping
+                if (symbol === "SOL") {
+                    const wsolAddress =
+                        "So11111111111111111111111111111111111111112";
+                    const wsolToken = {
+                        ...token,
+                        tokenSymbol: "WSOL",
+                        tokenContractAddress: wsolAddress,
+                    };
+                    symbolToToken.set("WSOL", wsolToken);
+                    addressToToken.set(wsolAddress.toLowerCase(), wsolToken);
+                }
+
+                console.log(
+                    `Mapped token: ${symbol} -> ${address} (decimals: ${token.decimals})`
+                );
             }
         });
 
-        console.log("Available symbols:", Array.from(symbolToToken.keys()));
+        // Debug output
+        const availableSymbols = Array.from(symbolToToken.keys()).sort();
+        console.log("Available symbols:", availableSymbols);
 
-        // Resolve from token
-        let fromTokenAddress: string | undefined;
-        if (
-            fromToken.toUpperCase() === "SOL" ||
-            fromToken === NATIVE_SOL.address
-        ) {
-            fromTokenAddress = NATIVE_SOL.address;
-        } else {
-            const token =
-                addressToToken.get(fromToken.toLowerCase()) ||
-                symbolToToken.get(fromToken.toUpperCase());
-            fromTokenAddress = token?.tokenContractAddress;
-        }
+        // Resolve token info using maps
+        const fromTokenInfo =
+            symbolToToken.get(fromToken.toUpperCase()) ||
+            addressToToken.get(fromToken.toLowerCase());
+        const toTokenInfo =
+            symbolToToken.get(toToken.toUpperCase()) ||
+            addressToToken.get(toToken.toLowerCase());
 
-        // Resolve to token
-        let toTokenAddress: string | undefined;
-        if (toToken.toUpperCase() === "SOL" || toToken === NATIVE_SOL.address) {
-            toTokenAddress = NATIVE_SOL.address;
-        } else {
-            const token =
-                addressToToken.get(toToken.toLowerCase()) ||
-                symbolToToken.get(toToken.toUpperCase());
-            toTokenAddress = token?.tokenContractAddress;
-        }
-
-        console.log("Resolved addresses:", {
-            fromTokenAddress,
-            toTokenAddress,
-        });
-
-        if (!fromTokenAddress) {
+        if (!fromTokenInfo || !toTokenInfo) {
+            const availableTokens = Array.from(symbolToToken.keys()).join(", ");
             throw new Error(
-                `Could not resolve token address for: ${fromToken}`
+                `Could not resolve tokens. Available tokens: ${availableTokens}`
             );
         }
 
-        if (!toTokenAddress) {
-            throw new Error(`Could not resolve token address for: ${toToken}`);
-        }
+        // Use resolved addresses
+        const fromTokenAddress = fromTokenInfo.tokenContractAddress;
+        const toTokenAddress = toTokenInfo.tokenContractAddress;
 
-        // Get decimals for amount conversion
+        // Convert amount using the token's decimals from API
         let decimals: number;
         if (fromTokenAddress === NATIVE_SOL.address) {
             decimals = NATIVE_SOL.decimals;
@@ -243,6 +249,49 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
     }
 }
 
+function formatQuoteResponse(quote: QuoteData): FormattedSwapResponse {
+    // Use decimal from quote response
+    const fromDecimals = parseInt(quote.fromToken.decimal);
+    const toDecimals = parseInt(quote.toToken.decimal);
+
+    // Convert amounts using proper decimals
+    const displayFromAmount = (
+        Number(quote.fromTokenAmount) / Math.pow(10, fromDecimals)
+    ).toString();
+
+    const displayToAmount = (
+        Number(quote.toTokenAmount) / Math.pow(10, toDecimals)
+    ).toString();
+
+    return {
+        success: true,
+        quote: {
+            fromToken: {
+                symbol: quote.fromToken.tokenSymbol,
+                amount: displayFromAmount,
+                decimal: quote.fromToken.decimal, // Keep original decimal field
+                unitPrice: quote.fromToken.tokenUnitPrice,
+            },
+            toToken: {
+                symbol: quote.toToken.tokenSymbol,
+                amount: displayToAmount,
+                decimal: quote.toToken.decimal, // Keep original decimal field
+                unitPrice: quote.toToken.tokenUnitPrice,
+            },
+            priceImpact: quote.priceImpactPercentage + "%",
+            dexRoutes: quote.quoteCompareList.map((route) => ({
+                dex: route.dexName,
+                amountOut: route.amountOut,
+                fee: route.tradeFee,
+            })),
+        },
+        summary:
+            `Quote for ${displayFromAmount} ${quote.fromToken.tokenSymbol} to ${quote.toToken.tokenSymbol}:\n` +
+            `Expected output: ${displayToAmount} ${quote.toToken.tokenSymbol}\n` +
+            `Price impact: ${quote.priceImpactPercentage}%`,
+    };
+}
+
 function getActionHandler(
     actionName: string,
     actionDescription: string,
@@ -288,70 +337,7 @@ function getActionHandler(
                     );
 
                     if (quoteResult.code === "0" && quoteResult.data?.[0]) {
-                        const quote = quoteResult.data[0];
-
-                        // Get decimals from quote response
-                        const fromDecimals = parseInt(quote.fromToken.decimals);
-                        const toDecimals = parseInt(quote.toToken.decimals);
-
-                        console.log("Processing amounts with decimals:", {
-                            fromDecimals,
-                            toDecimals,
-                            fromAmount: params.amount,
-                            toAmount: quote.toTokenAmount,
-                        });
-
-                        // Convert amounts considering decimals
-                        const displayFromAmount = (
-                            parseFloat(params.amount) /
-                            Math.pow(10, fromDecimals)
-                        ).toString();
-                        const displayToAmount = (
-                            parseFloat(quote.toTokenAmount) /
-                            Math.pow(10, toDecimals)
-                        ).toString();
-
-                        console.log("Converted amounts:", {
-                            displayFromAmount,
-                            displayToAmount,
-                        });
-
-                        // Format response
-                        const formattedResponse = {
-                            success: true,
-                            quote: {
-                                fromToken: {
-                                    symbol: quote.fromToken.tokenSymbol,
-                                    amount: displayFromAmount,
-                                    decimals: quote.fromToken.decimals,
-                                    unitPrice: quote.fromToken.tokenUnitPrice,
-                                },
-                                toToken: {
-                                    symbol: quote.toToken.tokenSymbol,
-                                    amount: displayToAmount,
-                                    decimals: quote.toToken.decimals,
-                                    unitPrice: quote.toToken.tokenUnitPrice,
-                                },
-                                priceImpact: quote.priceImpactPercentage + "%",
-                                dexRoutes: quote.quoteCompareList.map(
-                                    (route) => ({
-                                        dex: route.dexName,
-                                        amountOut: route.amountOut,
-                                        fee: route.tradeFee,
-                                    })
-                                ),
-                            },
-                            summary:
-                                `Quote for ${displayFromAmount} ${quote.fromToken.tokenSymbol} to ${quote.toToken.tokenSymbol}:\n` +
-                                `Expected output: ${displayToAmount} ${quote.toToken.tokenSymbol}\n` +
-                                `Price impact: ${quote.priceImpactPercentage}%\n` +
-                                `Best route via: ${
-                                    quote.quoteCompareList[0]?.dexName ||
-                                    "Unknown"
-                                }`,
-                        };
-
-                        result = formattedResponse;
+                        result = formatQuoteResponse(quoteResult.data[0]);
                     } else {
                         throw new Error(
                             quoteResult.msg || "Failed to get quote"
@@ -359,17 +345,17 @@ function getActionHandler(
                     }
                     break;
                 }
+
                 case "GET_SWAP_TRANSACTION_DATA": {
                     const params = await extractSwapParams(message, client);
 
-                    // Get swap data
                     const swapResponse = await client.dex.getSwapData({
                         chainId: "501",
                         fromTokenAddress: params.fromTokenAddress,
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
                         autoSlippage: true,
-                        maxAutoSlippage: "1000", // 10% in basis points
+                        maxAutoSlippage: "1000",
                     });
 
                     if (swapResponse.code !== "0" || !swapResponse.data?.[0]) {
@@ -379,63 +365,7 @@ function getActionHandler(
                         );
                     }
 
-                    const swapData = swapResponse.data[0];
-                    // Calculate display amounts using decimals from the response
-                    const fromDecimals = parseInt(swapData.fromToken.decimals);
-                    const toDecimals = parseInt(swapData.toToken.decimals);
-                    const displayFromAmount = (
-                        parseFloat(swapData.fromTokenAmount) /
-                        Math.pow(10, fromDecimals)
-                    ).toString();
-                    const displayToAmount = (
-                        parseFloat(swapData.toTokenAmount) /
-                        Math.pow(10, toDecimals)
-                    ).toString();
-
-                    // Format the response
-                    const formattedResponse: FormattedSwapResponse = {
-                        success: true,
-                        quote: {
-                            fromToken: {
-                                symbol: swapData.fromToken.tokenSymbol,
-                                amount: displayFromAmount,
-                                decimal: swapData.fromToken.decimals,
-                                unitPrice: swapData.fromToken.tokenUnitPrice,
-                            },
-                            toToken: {
-                                symbol: swapData.toToken.tokenSymbol,
-                                amount: displayToAmount,
-                                decimal: swapData.toToken.decimals,
-                                unitPrice: swapData.toToken.tokenUnitPrice,
-                            },
-                            priceImpact: swapData.priceImpactPercentage + "%",
-                            dexRoutes: swapData.quoteCompareList.map(
-                                (route) => ({
-                                    dex: route.dexName,
-                                    amountOut: route.amountOut,
-                                    fee: route.tradeFee,
-                                })
-                            ),
-                        },
-                        summary: [
-                            `Swap Transaction Data:`,
-                            `From: ${displayFromAmount} ${swapData.fromToken.tokenSymbol}`,
-                            `To: ${displayToAmount} ${swapData.toToken.tokenSymbol}`,
-                            `Price Impact: ${swapData.priceImpactPercentage}%`,
-                            `Estimated Gas Fee: ${swapData.estimateGasFee}`,
-                            `Best Route: ${
-                                swapData.quoteCompareList[0]?.dexName ||
-                                "Unknown"
-                            }`,
-                            swapData.tx?.data
-                                ? `Transaction Data Available`
-                                : "No Transaction Data",
-                        ].join("\n"),
-                        // Include the transaction data if available
-                        tx: swapData.tx,
-                    };
-
-                    result = formattedResponse;
+                    result = formatQuoteResponse(swapResponse.data[0]);
                     break;
                 }
 
@@ -501,7 +431,7 @@ export async function getOKXActions(
             description: "Get Solana chain data from OKX DEX",
             similes: [],
             validate: async () => true,
-            examples: [], // Empty array is fine if no examples
+            examples: [],
         },
         {
             name: "GET_LIQUIDITY_PROVIDERS",

@@ -1,5 +1,16 @@
+// okx/types/index.ts
+
 export interface TokenInfo {
-    decimals: string;
+    decimal: string; // Changed from decimals to decimal to match API
+    isHoneyPot: boolean;
+    taxRate: string;
+    tokenContractAddress: string;
+    tokenSymbol: string;
+    tokenUnitPrice: string;
+}
+
+export interface TokenInfoList {
+    decimal: string; // Changed from decimals to decimal to match API
     isHoneyPot: boolean;
     taxRate: string;
     tokenContractAddress: string;
@@ -31,23 +42,39 @@ export interface QuoteCompareItem {
     tradeFee: string;
 }
 
-export interface QuoteData {
-    chainId: string;
-    dexRouterList: DexRouter[];
-    estimateGasFee: string;
-    fromToken: TokenInfo;
-    fromTokenAmount: string;
-    priceImpactPercentage: string;
-    quoteCompareList: QuoteCompareItem[];
-    toToken: TokenInfo;
-    toTokenAmount: string;
-    tradeFee: string;
-    tx?: {
-        data: string;
-    };
-    data?: string;
+// Token list endpoint types (from /api/v5/dex/aggregator/all-tokens)
+export interface TokenListInfo {
+    decimals: string; // Token list returns "decimals"
+    tokenContractAddress: string;
+    tokenLogoUrl?: string;
+    tokenName?: string;
+    tokenSymbol: string;
 }
 
+// Quote endpoint types (from /api/v5/dex/aggregator/quote)
+export interface QuoteTokenInfo {
+    decimal: string; // API returns "decimal" not "decimals"
+    isHoneyPot: boolean;
+    taxRate: string;
+    tokenContractAddress: string;
+    tokenSymbol: string;
+    tokenUnitPrice: string;
+}
+
+export interface QuoteData {
+    chainId: string;
+    fromToken: QuoteTokenInfo;
+    toToken: QuoteTokenInfo;
+    fromTokenAmount: string;
+    toTokenAmount: string;
+    priceImpactPercentage: string;
+    estimateGasFee: string;
+    tradeFee: string;
+    quoteCompareList: QuoteCompareItem[];
+    dexRouterList: DexRouter[];
+}
+
+// Generic API response wrapper with proper typing
 export interface APIResponse<T> {
     code: string;
     msg: string;
