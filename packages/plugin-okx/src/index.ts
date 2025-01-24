@@ -2,9 +2,9 @@
 import type { Plugin } from "@elizaos/core";
 import { getOKXActions } from "./actions";
 
-async function createOKXPlugin(
+export const createOKXPlugin = async (
     getSetting: (key: string) => string | undefined
-): Promise<Plugin> {
+): Promise<Plugin> => {
     // Validate required settings
     const requiredSettings = [
         "OKX_API_KEY",
@@ -48,6 +48,6 @@ async function createOKXPlugin(
         console.error("Error initializing OKX plugin:", error);
         throw error;
     }
-}
+};
 
 export default createOKXPlugin;

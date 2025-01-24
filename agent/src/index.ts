@@ -1,4 +1,4 @@
-import createOKXPlugin from "../../packages/plugin-okx/dist/index.js";
+import { createOKXPlugin } from "@elizaos/plugin-okx";
 import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite";
 import { PostgresDatabaseAdapter } from "@elizaos/adapter-postgres";
 import { RedisClient } from "@elizaos/adapter-redis";
