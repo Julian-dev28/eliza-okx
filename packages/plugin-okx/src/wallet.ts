@@ -5,10 +5,10 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const solanaWalletAddress = process.env.WALLET_ADDRESS;
-const solanaPrivateKeyValue = process.env.PRIVATE_KEY;
-const solanaRpcUrl = process.env.SOLANA_RPC_URL;
-const solanaWsEndpoint = process.env.WS_ENDPONT;
+// const solanaWalletAddress = process.env.OKX_WALLET_ADDRESS;
+const solanaPrivateKeyValue = process.env.OKX_WALLET_PRIVATE_KEY;
+const solanaRpcUrl = process.env.OKX_SOLANA_RPC_URL;
+// const solanaWsEndpoint = process.env.OKX_WS_ENDPONT;
 
 // Interface for the wallet client
 export interface SolanaWalletClientBase {
@@ -24,17 +24,11 @@ class SolanaWallet implements SolanaWalletClientBase {
     private connection: web3.Connection;
     private keypair: web3.Keypair;
 
-    constructor(
-        privateKey: string,
-        rpcUrl: string,
-        wsEndpoint?: string
-    ) {
+    constructor(privateKey: string, rpcUrl: string, wsEndpoint?: string) {
         this.connection = new web3.Connection(rpcUrl, {
-            wsEndpoint: wsEndpoint
+            wsEndpoint: wsEndpoint,
         });
-        this.keypair = web3.Keypair.fromSecretKey(
-            base58.decode(privateKey)
-        );
+        this.keypair = web3.Keypair.fromSecretKey(base58.decode(privateKey));
     }
 
     getAddress(): string {
@@ -42,11 +36,15 @@ class SolanaWallet implements SolanaWalletClientBase {
     }
 
     async balanceOf(address: string): Promise<string> {
-        const balance = await this.connection.getBalance(new web3.PublicKey(address));
+        const balance = await this.connection.getBalance(
+            new web3.PublicKey(address),
+        );
         return (balance / web3.LAMPORTS_PER_SOL).toString();
     }
 
-    async signTransaction(transaction: web3.Transaction): Promise<web3.Transaction> {
+    async signTransaction(
+        transaction: web3.Transaction,
+    ): Promise<web3.Transaction> {
         transaction.partialSign(this.keypair);
         return transaction;
     }
@@ -66,7 +64,7 @@ class SolanaWallet implements SolanaWalletClientBase {
 }
 
 export function getSolanaWalletClient(
-    getSetting: (key: string) => string | undefined
+    getSetting: (key: string) => string | undefined,
 ): SolanaWalletClientBase | null {
     const privateKey = getSetting(solanaPrivateKeyValue);
     if (!privateKey) return null;
@@ -74,9 +72,9 @@ export function getSolanaWalletClient(
     const rpcUrl = getSetting(solanaRpcUrl);
     if (!rpcUrl) throw new Error("SOLANA_RPC_URL not configured");
 
-    const wsEndpoint = getSetting(solanaWsEndpoint);
+    // const wsEndpoint = getSetting(solanaWsEndpoint);
 
-    return new SolanaWallet(privateKey, rpcUrl, wsEndpoint);
+    return new SolanaWallet(privateKey, rpcUrl); // add if needed wsEndpoint;
 }
 
 export function getSolanaWalletProvider(walletClient: SolanaWalletClientBase) {

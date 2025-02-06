@@ -33,7 +33,7 @@ export function extractSwapParams(message: Memory): SwapParameters {
     };
 }
 
-export function validateSwapParams(params: SwapParameters): void {
+export function validateSwapParamsByChain(params: SwapParameters): void {
     // Validate Solana addresses
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(params.fromTokenAddress)) {
         throw new Error("Invalid from token address");

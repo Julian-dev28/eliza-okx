@@ -1,28 +1,26 @@
 // src/index.ts
-import type { Plugin } from "@elizaos/core";
+import type { Plugin, Character } from "@elizaos/core";
 import { getOKXActions } from "./actions";
 
-export const createOKXPlugin = async (
-    getSetting: (key: string) => string | undefined
-): Promise<Plugin> => {
+export const OKXPlugin = async (character: Character): Promise<Plugin> => {
+    const getSetting = (key: string) => character.settings?.secrets?.[key] || process.env[key];
+    
     // Validate required settings
     const requiredSettings = [
         "OKX_API_KEY",
         "OKX_SECRET_KEY",
         "OKX_API_PASSPHRASE",
         "OKX_PROJECT_ID",
-        "SOLANA_RPC_URL",
-        "PRIVATE_KEY",
+        "OKX_SOLANA_RPC_URL",
+        "OKX_WALLET_PRIVATE_KEY",
     ];
 
     const missingSettings = requiredSettings.filter(
-        (setting) => !getSetting(setting)
+        (setting) => !getSetting(setting),
     );
     if (missingSettings.length > 0) {
         console.warn(
-            `Missing required settings for OKX plugin: ${missingSettings.join(
-                ", "
-            )}`
+            `Missing required settings for OKX plugin: ${missingSettings.join(", ")}`
         );
         return {
             name: "OKX DEX Plugin",
@@ -30,12 +28,20 @@ export const createOKXPlugin = async (
             providers: [],
             evaluators: [],
             services: [],
-            actions: [], // Return empty actions if settings are missing
+            actions: [],
         };
     }
 
     try {
+        console.log("Initializing OKX DEX Plugin...");
         const actions = await getOKXActions(getSetting);
+        
+        // Simple action display
+        console.log("\nAvailable Actions:");
+        actions.forEach(action => {
+            console.log(`- ${action.name}: ${action.description}`);
+        });
+        
         return {
             name: "OKX DEX Plugin",
             description: "OKX DEX integration for Solana swaps",
@@ -50,4 +56,4 @@ export const createOKXPlugin = async (
     }
 };
 
-export default createOKXPlugin;
+export default OKXPlugin;

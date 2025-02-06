@@ -6,9 +6,9 @@ A plugin for integrating OKX DEX capabilities within the ElizaOS ecosystem, curr
 
 OKX DEX is a trading aggregator that this plugin integrates with Eliza. Currently, this plugin only supports:
 
--   Trading tokens on the Solana network
--   Direct routing through single liquidity pools
--   Price impact protection and slippage controls
+- Trading tokens on the Solana network
+- Direct routing through single liquidity pools
+- Price impact protection and slippage controls
 
 ## Installation
 
@@ -48,12 +48,12 @@ OKX_SECRET_KEY=<Your OKX secret key>
 OKX_API_PASSPHRASE=<Your API passphrase>
 
 # Wallet Configuration
-WALLET_ADDRESS=<Your Solana wallet address>
-PRIVATE_KEY=<Your wallet private key>
+OKX_WALLET_ADDRESS=<Your Solana wallet address>
+OKX_WALLET_PRIVATE_KEY=<Your wallet private key>
 
 # Network Configuration
-SOLANA_RPC_URL=<Your Solana RPC endpoint>
-WS_ENDPOINT=<Your WebSocket endpoint>
+OKX_SOLANA_RPC_URL=<Your Solana RPC endpoint>
+OKX_WS_ENDPOINT=<Your WebSocket endpoint>
 ```
 
 ## Usage
@@ -80,9 +80,9 @@ const swap = await okx.swap({
 
 ### Advanced Features
 
--   **Price Impact Protection**: Set `priceImpactProtectionPercentage` to limit maximum price impact
--   **Direct Routing**: Enable `directRoute` for single-pool routing (recommended for Solana)
--   **Compute Units**: Control transaction priority with `computeUnitPrice` and `computeUnitLimit`
+- **Price Impact Protection**: Set `priceImpactProtectionPercentage` to limit maximum price impact
+- **Direct Routing**: Enable `directRoute` for single-pool routing (recommended for Solana)
+- **Compute Units**: Control transaction priority with `computeUnitPrice` and `computeUnitLimit`
 
 ## Common Issues & Troubleshooting
 
@@ -119,5 +119,5 @@ This plugin is part of the Eliza project. See the main project repository for li
 
 ## Resources
 
--   [OKX DEX Documentation](https://www.okx.com/web3/build/docs/waas/dex-introduction)
--   [Developer Portal](https://www.okx.com/developers)
+- [OKX DEX Documentation](https://www.okx.com/web3/build/docs/waas/dex-introduction)
+- [Developer Portal](https://www.okx.com/developers)

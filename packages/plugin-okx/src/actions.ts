@@ -20,11 +20,29 @@ import {
     SwapExecutionData,
 } from "./okx/types";
 
-// Constants for native SOL
-const NATIVE_SOL = {
-    address: "11111111111111111111111111111111",
-    decimals: 9,
-};
+// Validate and format Solana address
+function formatSolanaAddress(address: string): string {
+    // Remove any whitespace
+    address = address.trim();
+
+    // Handle native SOL case
+    if (address.toLowerCase() === "11111111111111111111111111111111") {
+        return "11111111111111111111111111111111";
+    }
+
+    // Special case for SOL
+    if (address.toLowerCase() === "sol") {
+        return "11111111111111111111111111111111";
+    }
+
+    // Basic validation for Solana address format
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
+        throw new Error(`Invalid Solana address format: ${address}`);
+    }
+
+    // Keep original casing as Solana addresses are case-sensitive
+    return address;
+}
 
 async function extractSwapParams(message: Memory, client: OKXDexClient) {
     // Parse message content
@@ -41,9 +59,9 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
 
     // Extract amount and tokens with more flexible patterns
     const patterns = [
-        // Match "1.5 SOL to USDC" or "1.5 <address> to <address>"
+        // Match "300 <address> to <address>"
         /(?:quote|swap)?\s*(?:for)?\s*([+-]?\d*\.?\d+(?:e[+-]?\d+)?)\s*([\w.-]+)\s*(?:to|for|->|=>)\s*([\w.-]+)/i,
-        // Match "from SOL to USDC amount 1.5"
+        // Match "from <address> to <address> amount 300"
         /from\s*([\w.-]+)\s*(?:to|for|->|=>)\s*([\w.-]+)\s*(?:amount|quantity)?\s*([+-]?\d*\.?\d+(?:e[+-]?\d+)?)/i,
         // Legacy format
         /from_token:\s*([\w.-]+)\s*to_token:\s*([\w.-]+)\s*amount:\s*([+-]?\d*\.?\d+(?:e[+-]?\d+)?)/i,
@@ -75,7 +93,7 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
     // If not found in combined patterns, try individual patterns
     if (!amount || !fromToken || !toToken) {
         const amountMatch = messageContent.match(
-            /([+-]?\d*\.?\d+(?:e[+-]?\d+)?)/
+            /([+-]?\d*\.?\d+(?:e[+-]?\d+)?)/,
         );
         const fromMatch =
             messageContent.match(/from\s*([\w.-]+)/i) ||
@@ -87,26 +105,32 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
         toToken = toToken || toMatch?.[1] || "";
     }
 
-    // Ensure values are strings and trimmed
-    fromToken = String(fromToken || "").trim();
-    toToken = String(toToken || "").trim();
+    // Format addresses
+    try {
+        fromToken = formatSolanaAddress(fromToken);
+        toToken = formatSolanaAddress(toToken);
+    } catch (error) {
+        throw new Error(
+            `Address format error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 
     console.log("Processed tokens:", { fromToken, toToken });
 
     // Basic validation
     if (!fromToken) {
         throw new Error(
-            "Could not determine the source token. " +
-                "Please provide a valid token symbol or address. " +
-                "Example: 'quote for 1.5 SOL to USDC'"
+            "Could not determine the source token address. " +
+                "Please provide a valid Solana token address. " +
+                "Example: 'quote for 300 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v to 6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'",
         );
     }
 
     if (!toToken) {
         throw new Error(
-            "Could not determine the target token. " +
-                "Please provide a valid token symbol or address. " +
-                "Example: 'quote for 1.5 SOL to USDC'"
+            "Could not determine the target token address. " +
+                "Please provide a valid Solana token address. " +
+                "Example: 'quote for 300 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v to 6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'",
         );
     }
 
@@ -114,157 +138,75 @@ async function extractSwapParams(message: Memory, client: OKXDexClient) {
         throw new Error(
             "Could not determine the amount to swap. " +
                 "Please specify the amount. " +
-                "Example: 'quote for 1.5 SOL to USDC'"
+                "Example: 'quote for 300 EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v to 6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'",
         );
     }
 
     try {
-        // Get token list for address lookup and decimal information
-        console.log("Fetching token information...");
-        const tokenResponse = await client.dex.getTokens("501");
-        const tokenListResponse =
-            tokenResponse as unknown as APIResponse<TokenListInfo>;
-
-        if (
-            !tokenListResponse ||
-            tokenListResponse.code !== "0" ||
-            !Array.isArray(tokenListResponse.data)
-        ) {
-            console.error("Invalid token response:", tokenListResponse);
-            throw new Error("Failed to fetch token information");
-        }
-
-        // console.log("First few tokens:", tokenListResponse.data.slice(0, 5));
-
-        // Create token maps with proper typing
-        const symbolToToken = new Map<string, TokenListInfo>();
-        const addressToToken = new Map<string, TokenListInfo>();
-
-        // Build token maps from API response
-        tokenListResponse.data.forEach((token) => {
-            if (
-                token?.tokenSymbol &&
-                token?.tokenContractAddress &&
-                token?.decimals
-            ) {
-                const symbol = token.tokenSymbol.toUpperCase();
-                const address = token.tokenContractAddress.toLowerCase();
-
-                // Store token info
-                symbolToToken.set(symbol, token);
-                addressToToken.set(address, token);
-
-                // Handle SOL/WSOL mapping
-                if (symbol === "SOL") {
-                    const wsolAddress =
-                        "So11111111111111111111111111111111111111112";
-                    const wsolToken = {
-                        ...token,
-                        tokenSymbol: "WSOL",
-                        tokenContractAddress: wsolAddress,
-                    };
-                    symbolToToken.set("WSOL", wsolToken);
-                    addressToToken.set(wsolAddress.toLowerCase(), wsolToken);
-                }
-
-                // console.log(
-                //     `Mapped token: ${symbol} -> ${address} (decimals: ${token.decimals})`
-                // );
-            }
+        // Get the quote first to get token decimals
+        const preQuote = await client.dex.getQuote({
+            chainId: "501",
+            fromTokenAddress: fromToken,
+            toTokenAddress: toToken,
+            amount: "10000000000", // Dummy amount to get token info
+            slippage: "0.1",
         });
 
-        // Debug output
-        // const availableSymbols = Array.from(symbolToToken.keys()).sort();
-        // console.log("Available symbols:", availableSymbols);
-
-        // Resolve token info using maps
-        const fromTokenInfo =
-            symbolToToken.get(fromToken.toUpperCase()) ||
-            addressToToken.get(fromToken.toLowerCase());
-        const toTokenInfo =
-            symbolToToken.get(toToken.toUpperCase()) ||
-            addressToToken.get(toToken.toLowerCase());
-
-        if (!fromTokenInfo || !toTokenInfo) {
-            const availableTokens = Array.from(symbolToToken.keys()).join(", ");
-            throw new Error(
-                `Could not resolve tokens. Available tokens: ${availableTokens}`
-            );
+        if (preQuote.code !== "0" || !preQuote.data?.[0]) {
+            throw new Error(preQuote.msg || "Failed to get token information");
         }
 
-        // Use resolved addresses
-        const fromTokenAddress = fromTokenInfo.tokenContractAddress;
-        const toTokenAddress = toTokenInfo.tokenContractAddress;
+        // Get decimals from the response
+        const fromDecimals = parseInt(preQuote.data[0].fromToken.decimal);
 
-        // Convert amount using the token's decimals from API
-        let decimals: number;
-        if (fromTokenAddress === NATIVE_SOL.address) {
-            decimals = NATIVE_SOL.decimals;
-        } else {
-            const token =
-                addressToToken.get(fromTokenAddress.toLowerCase()) ||
-                symbolToToken.get(fromToken.toUpperCase());
-
-            if (!token) {
-                throw new Error(`Could not find token info for: ${fromToken}`);
-            }
-
-            decimals = parseInt(token.decimals);
-            if (isNaN(decimals)) {
-                throw new Error(
-                    `Invalid decimal value for token: ${fromToken}`
-                );
-            }
-        }
-
-        // Convert amount
+        // Parse amount and convert to smallest unit
         const parsedAmount = parseFloat(amount);
         if (isNaN(parsedAmount)) {
             throw new Error(`Invalid amount value: ${amount}`);
         }
-        const amountInSmallestUnit = (
-            parsedAmount * Math.pow(10, decimals)
+
+        // Convert to smallest unit using the correct decimals
+        const amountInSmallestUnit = Math.floor(
+            parsedAmount * Math.pow(10, fromDecimals),
         ).toString();
 
-        console.log("Final parameters:", {
-            fromTokenAddress,
-            toTokenAddress,
-            amount: amountInSmallestUnit,
+        console.log("Conversion details:", {
             originalAmount: amount,
-            decimals,
+            parsedAmount,
+            fromDecimals,
+            amountInSmallestUnit,
         });
 
         return {
-            fromTokenAddress,
-            toTokenAddress,
+            fromTokenAddress: fromToken,
+            toTokenAddress: toToken,
             amount: amountInSmallestUnit,
         };
     } catch (error) {
         console.error("Error in extractSwapParams:", error);
         throw new Error(
-            `Failed to process swap parameters: ${
-                error instanceof Error ? error.message : String(error)
-            }`
+            `Failed to process swap parameters: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
 }
-
 function formatQuoteResponse(
-    data: QuoteData | SwapExecutionData
+    data: QuoteData | SwapExecutionData,
 ): FormattedSwapResponse {
     // Extract the relevant data whether it's a quote or swap response
     const quote = "routerResult" in data ? data.routerResult : data;
 
+    // Get decimals from the response
     const fromDecimals = parseInt(quote.fromToken.decimal);
     const toDecimals = parseInt(quote.toToken.decimal);
 
+    // Convert amounts using the decimals from the response
     const displayFromAmount = (
         Number(quote.fromTokenAmount) / Math.pow(10, fromDecimals)
-    ).toString();
+    ).toFixed(6);
 
     const displayToAmount = (
         Number(quote.toTokenAmount) / Math.pow(10, toDecimals)
-    ).toString();
+    ).toFixed(6);
 
     return {
         success: true,
@@ -288,6 +230,7 @@ function formatQuoteResponse(
                 fee: route.tradeFee,
             })),
         },
+
         summary:
             `Quote for ${displayFromAmount} ${quote.fromToken.tokenSymbol} to ${quote.toToken.tokenSymbol}:\n` +
             `Expected output: ${displayToAmount} ${quote.toToken.tokenSymbol}\n` +
@@ -298,14 +241,14 @@ function formatQuoteResponse(
 function getActionHandler(
     actionName: string,
     actionDescription: string,
-    client: OKXDexClient
+    client: OKXDexClient,
 ) {
     return async (
         runtime: IAgentRuntime,
         message: Memory,
         state: State | undefined,
         options?: Record<string, unknown>,
-        callback?: HandlerCallback
+        callback?: HandlerCallback,
     ): Promise<boolean> => {
         let currentState = state ?? (await runtime.composeState(message));
         currentState = await runtime.updateRecentMessageState(currentState);
@@ -315,9 +258,8 @@ function getActionHandler(
 
             switch (actionName) {
                 case "GET_CHAIN_DATA":
-                    const chainData = await client.dex.getSupportedChains(
-                        "501"
-                    );
+                    const chainData =
+                        await client.dex.getSupportedChains("501");
                     result = {
                         chains: chainData.data.map((chain) => ({
                             id: chain.chainId,
@@ -342,19 +284,19 @@ function getActionHandler(
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
                         slippage: "0.1",
-                        userWalletAddress: process.env.WALLET_ADDRESS,
+                        userWalletAddress: process.env.OKX_WALLET_ADDRESS,
                     });
 
                     console.log(
                         "Received quote result:",
-                        JSON.stringify(quoteResult, null, 2)
+                        JSON.stringify(quoteResult, null, 2),
                     );
 
                     if (quoteResult.code === "0" && quoteResult.data?.[0]) {
                         result = formatQuoteResponse(quoteResult.data[0]);
                     } else {
                         throw new Error(
-                            quoteResult.msg || "Failed to get quote"
+                            quoteResult.msg || "Failed to get quote",
                         );
                     }
                     break;
@@ -368,19 +310,36 @@ function getActionHandler(
                         fromTokenAddress: params.fromTokenAddress,
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
-                        autoSlippage: true,
-                        maxAutoSlippage: "1000",
-                        userWalletAddress: process.env.WALLET_ADDRESS,
+                        slippage: "0.5",
+                        // autoSlippage: true,
+                        // maxAutoSlippage: "1000",
+                        userWalletAddress: process.env.OKX_WALLET_ADDRESS,
                     });
 
                     if (swapResponse.code !== "0" || !swapResponse.data?.[0]) {
                         throw new Error(
                             swapResponse.msg ||
-                                "Failed to get swap transaction data"
+                                "Failed to get swap transaction data",
                         );
                     }
 
                     result = formatQuoteResponse(swapResponse.data[0]);
+
+                    const swapData = swapResponse.data[0];
+    
+                    // Extract transaction data
+                    const transactionData = {
+                        chainId: swapData.routerResult.chainId,
+                        estimateGasFee: swapData.routerResult.estimateGasFee,
+                        tx: swapData.tx || null
+                    };
+                
+                    const txData = {
+                        ...formatQuoteResponse(swapData),
+                        transaction: transactionData
+                    };
+                    console.log('OKX Swap Result:', JSON.stringify(txData, null, 2));
+
                     break;
                 }
 
@@ -399,17 +358,17 @@ function getActionHandler(
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
                         slippage: "0.5",
-                        userWalletAddress: process.env.WALLET_ADDRESS,
+                        userWalletAddress: process.env.OKX_WALLET_ADDRESS,
                     });
 
                     console.log(
                         "Received swap data response:",
-                        JSON.stringify(swapResponse, null, 2)
+                        JSON.stringify(swapResponse, null, 2),
                     );
 
                     if (swapResponse.code !== "0" || !swapResponse.data?.[0]) {
                         throw new Error(
-                            swapResponse?.msg || "Failed to get swap data"
+                            swapResponse?.msg || "Failed to get swap data",
                         );
                     }
 
@@ -423,7 +382,7 @@ function getActionHandler(
                     ) {
                         console.error(
                             "Missing decimal information in token data:",
-                            routerResult
+                            routerResult,
                         );
                         throw new Error("Invalid token decimal information");
                     }
@@ -458,7 +417,7 @@ function getActionHandler(
                         toTokenAddress: params.toTokenAddress,
                         amount: params.amount,
                         slippage: "0.5",
-                        userWalletAddress: process.env.WALLET_ADDRESS,
+                        userWalletAddress: process.env.OKX_WALLET_ADDRESS,
                     });
 
                     // Format the result for display
@@ -537,7 +496,7 @@ function getActionHandler(
 }
 
 export async function getOKXActions(
-    getSetting: (key: string) => string | undefined
+    getSetting: (key: string) => string | undefined,
 ) {
     const actionsWithoutHandler: Omit<Action, "handler">[] = [
         {
@@ -662,10 +621,10 @@ export async function getOKXActions(
         projectId: getSetting("OKX_PROJECT_ID")!,
         solana: {
             connection: {
-                rpcUrl: getSetting("SOLANA_RPC_URL")!,
-                wsEndpoint: getSetting("SOLANA_WS_URL"),
+                rpcUrl: getSetting("OKX_SOLANA_RPC_URL")!,
+                // wsEndpoint: getSetting("OKX_WS_ENDPONT"),
             },
-            privateKey: getSetting("PRIVATE_KEY")!,
+            privateKey: getSetting("OKX_WALLET_PRIVATE_KEY")!,
         },
     });
 
